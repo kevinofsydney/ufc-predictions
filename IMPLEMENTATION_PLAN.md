@@ -28,7 +28,7 @@ phase's code. This checklist is the resume point for any future agent.
 - [x] Phase 1 — UFC-DataLab ingest (gate: ~8,700 fights / ~3,700 fighters, recent max date)
 - [x] Phase 2 — Normalise into SQLite (gate: row counts, >95% non-NULL winner, `pytest tests/test_parse.py`)
 - [x] Phase 3 — Elo engine (gate: unit tests + top-15 pass; higher-rated wins 57.4% — accepted with deviation, see §1.6)
-- [ ] Phase 4 — Point-in-time features (gate: leakage-guard test, label mean 0.45–0.55, NULL audit)
+- [x] Phase 4 — Point-in-time features (gate: 8,581 rows, leakage guard passes, label mean 0.5006, max NULL 37.82%)
 - [ ] Phase 5 — Training + evaluation (gate: artifacts produced, metrics within sanity bounds)
 - [ ] Phase 6 — Prediction CLI (gate: lopsided matchup sanity, probs sum to 100%)
 - [ ] Phase 7 — Incremental update (gate: second consecutive run ingests 0 new fights)
