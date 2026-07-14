@@ -31,7 +31,7 @@ phase's code. This checklist is the resume point for any future agent.
 - [x] Phase 4 — Point-in-time features (gate: 8,581 rows, leakage guard passes, label mean 0.5006, max NULL 37.82%)
 - [x] Phase 5 — Training + evaluation (gate: artifacts produced; LightGBM test log loss 0.6637, accuracy 60.54%; logistic test log loss 0.6535)
 - [x] Phase 6 — Prediction CLI (gate: Jones–Punk 84.7%/15.3%, order-symmetric, probabilities sum to 100%)
-- [ ] Phase 7 — Incremental update (gate: second consecutive run ingests 0 new fights)
+- [x] Phase 7 — Incremental update (gate: two consecutive live runs ingest 0 new fights)
 - [ ] Wrap-up — README + Definition of Done (Part 2 §11)
 
 ## 1.2 Model tiers (cost-efficient allocation)
@@ -123,6 +123,12 @@ These adapt Part 2 to the actual repo/host without changing any design decision:
   0.6535 on test but was not selected after test inspection: LightGBM was better on the
   validation split (0.6563 vs 0.6606), so switching would leak test-set information into
   model selection. The <0.66 final-model criterion remains open for the wrap-up audit.
+- **Phase 7:** Scrapy 2.11.1 is compatible with the vendored spider but its unconstrained
+  resolver installed incompatible Twisted 26.4 on this Python 3.12 host. Twisted 23.10.0
+  (the upstream environment's exact version) is now pinned for fresh installs; the
+  already-installed Twisted was preserved, and the live gate used a separate local
+  `.venv/scrapy_compat` overlay. Two paced live incremental runs completed with zero new
+  fights. Refresh CSVs, logs, and append-only history are retained under `data/`.
 
 ---
 

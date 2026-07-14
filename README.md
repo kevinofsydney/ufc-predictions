@@ -20,7 +20,7 @@ for running and maintaining the local project.
 | 4 — point-in-time features | Complete | `features` table |
 | 5 — model training | Complete | `models/model.pkl`, reports |
 | 6 — named-matchup CLI | Complete | `ufcpred.predict` command |
-| 7 — automated incremental updates | Not implemented yet | planned update command |
+| 7 — automated incremental updates | Complete | `ufcpred.update` command |
 
 The current validation-selected model is LightGBM. Its test log loss is `0.6637` and
 test accuracy is `60.54%`. Logistic regression scored `0.6535` and `61.40%` on the same
@@ -192,6 +192,52 @@ fewer than three prior UFC fights.
 Omit `--date` to use today's date. Use `--model <path>` to inspect a preserved model
 artifact instead of `models/model.pkl`.
 
+## Incremental updates
+
+Run the weekly incremental refresh with:
+
+```powershell
+.\.venv\Scripts\python.exe -m ufcpred.update
+```
+
+The command reads the latest event date from SQLite and passes it to the vendored spider,
+so only newer completed events and their fights are requested. Network settings are fixed
+at one concurrent request, a two-second delay, and a descriptive user agent. Every CSV
+export and complete spider log is retained beneath `data/refreshes/`; every run appends a
+JSON record to `data/update_history.jsonl`.
+
+When new fights are found, the command inserts only unseen deterministic fight ids, then
+rebuilds Elo and point-in-time features with non-deleting upserts. It retrains at most
+monthly unless explicitly forced:
+
+```powershell
+.\.venv\Scripts\python.exe -m ufcpred.update --force-retrain
+```
+
+Reprocess a preserved export without network requests:
+
+```powershell
+.\.venv\Scripts\python.exe -m ufcpred.update --refresh-csv data\refreshes\YYYYMMDDTHHMMSSZ\ufc_stats_refresh.csv
+```
+
+Once per month, review and fast-forward the vendored source:
+
+```powershell
+.\.venv\Scripts\python.exe -m ufcpred.update --pull-upstream
+```
+
+The command refuses an upstream merge containing deleted or renamed paths. After a human
+has reviewed and explicitly approved those removals, the opt-in form is:
+
+```powershell
+.\.venv\Scripts\python.exe -m ufcpred.update --pull-upstream --allow-upstream-removals
+```
+
+If the spider fails, its log and partial/new export directory remain preserved and the
+command exits nonzero. Inspect that log and the upstream UFC-DataLab project. The custom
+scraper in `IMPLEMENTATION_PLAN.md` Appendix A remains the fallback only if UFC-DataLab is
+abandoned; implementing that fallback is outside v1 scope.
+
 ## Running tests
 
 Run only the project's tests because `vendor/UFC-DataLab` contains its own unrelated test
@@ -201,14 +247,14 @@ suite and is inside the working tree:
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-The current expected result is 30 passing tests. Bare `pytest` currently descends into
+The current expected result is 37 passing tests. Bare `pytest` currently descends into
 the vendored repository and can fail during collection; repository-level pytest exclusion
 will be added during final wrap-up.
 
 ## Dataset maintenance
 
-Phase 7 will automate safe incremental refreshes. Until then, refresh the dataset
-manually and deliberately.
+Use `python -m ufcpred.update` for routine incremental refreshes. The manual workflow
+below remains useful for recovery, source audits, and major upstream revisions.
 
 ### 1. Preserve the current state
 
@@ -282,6 +328,7 @@ src/ufcpred/
   features.py    point-in-time differential features
   train.py       chronological training and reporting
   predict.py     as-of-date named-matchup prediction CLI
+  update.py      paced incremental scraping and non-deleting ingestion
 tests/           parser, Elo, leakage, and training helper tests
 data/            local database, metadata, warnings, and archives (ignored)
 vendor/          local UFC-DataLab checkout (ignored)

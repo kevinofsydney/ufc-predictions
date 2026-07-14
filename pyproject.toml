@@ -17,6 +17,8 @@ dependencies = [
     "matplotlib",
     "joblib",
     "pyarrow",
+    "scrapy==2.11.1",
+    "Twisted==23.10.0",
 ]
 
 [project.optional-dependencies]

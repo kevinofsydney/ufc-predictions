@@ -4,8 +4,8 @@ Run as:  python -m ufcpred.parse
 
 Reads the two dataframes produced by ``ufcpred.ingest.load_raw`` and populates
 the four tables defined in ``ufcpred.db`` (events, fighters, fights,
-fight_stats). All writes use ``INSERT OR REPLACE`` keyed on deterministic,
-name-derived surrogate ids, so re-running the module is idempotent.
+fight_stats). All writes use non-deleting SQLite upserts keyed on
+deterministic, name-derived surrogate ids, so re-running is idempotent.
 
 Surrogate keys (all sha1 hexdigests sliced to 16 chars):
     fighter_id = sha1(UPPER(name))[:16]
@@ -396,32 +396,75 @@ def run() -> dict:
     conn = get_conn()
     try:
         conn.executemany(
-            "INSERT OR REPLACE INTO fighters "
-            "(fighter_id, name, height_cm, reach_cm, stance, dob) "
-            "VALUES (:fighter_id, :name, :height_cm, :reach_cm, :stance, :dob)",
+            """
+            INSERT INTO fighters (fighter_id, name, height_cm, reach_cm, stance, dob)
+            VALUES (:fighter_id, :name, :height_cm, :reach_cm, :stance, :dob)
+            ON CONFLICT(fighter_id) DO UPDATE SET
+                name=excluded.name,
+                height_cm=excluded.height_cm,
+                reach_cm=excluded.reach_cm,
+                stance=excluded.stance,
+                dob=excluded.dob
+            """,
             fighter_rows,
         )
         conn.executemany(
-            "INSERT OR REPLACE INTO events (event_id, name, event_date, location) "
-            "VALUES (:event_id, :name, :event_date, :location)",
+            """
+            INSERT INTO events (event_id, name, event_date, location)
+            VALUES (:event_id, :name, :event_date, :location)
+            ON CONFLICT(event_id) DO UPDATE SET
+                name=excluded.name,
+                event_date=excluded.event_date,
+                location=excluded.location
+            """,
             list(events_by_id.values()),
         )
         conn.executemany(
-            "INSERT OR REPLACE INTO fights "
-            "(fight_id, event_id, fighter_a_id, fighter_b_id, winner_id, weight_class, "
-            "method, end_round, end_time_sec, is_title) VALUES "
-            "(:fight_id, :event_id, :fighter_a_id, :fighter_b_id, :winner_id, :weight_class, "
-            ":method, :end_round, :end_time_sec, :is_title)",
+            """
+            INSERT INTO fights
+                (fight_id, event_id, fighter_a_id, fighter_b_id, winner_id,
+                 weight_class, method, end_round, end_time_sec, is_title)
+            VALUES
+                (:fight_id, :event_id, :fighter_a_id, :fighter_b_id, :winner_id,
+                 :weight_class, :method, :end_round, :end_time_sec, :is_title)
+            ON CONFLICT(fight_id) DO UPDATE SET
+                event_id=excluded.event_id,
+                fighter_a_id=excluded.fighter_a_id,
+                fighter_b_id=excluded.fighter_b_id,
+                winner_id=excluded.winner_id,
+                weight_class=excluded.weight_class,
+                method=excluded.method,
+                end_round=excluded.end_round,
+                end_time_sec=excluded.end_time_sec,
+                is_title=excluded.is_title
+            """,
             fight_rows,
         )
         conn.executemany(
-            "INSERT OR REPLACE INTO fight_stats "
-            "(fight_id, fighter_id, knockdowns, sig_strikes_landed, sig_strikes_attempted, "
-            "total_strikes_landed, total_strikes_attempted, takedowns_landed, takedowns_attempted, "
-            "sub_attempts, reversals, control_time_sec) VALUES "
-            "(:fight_id, :fighter_id, :knockdowns, :sig_strikes_landed, :sig_strikes_attempted, "
-            ":total_strikes_landed, :total_strikes_attempted, :takedowns_landed, :takedowns_attempted, "
-            ":sub_attempts, :reversals, :control_time_sec)",
+            """
+            INSERT INTO fight_stats
+                (fight_id, fighter_id, knockdowns, sig_strikes_landed,
+                 sig_strikes_attempted, total_strikes_landed,
+                 total_strikes_attempted, takedowns_landed,
+                 takedowns_attempted, sub_attempts, reversals, control_time_sec)
+            VALUES
+                (:fight_id, :fighter_id, :knockdowns, :sig_strikes_landed,
+                 :sig_strikes_attempted, :total_strikes_landed,
+                 :total_strikes_attempted, :takedowns_landed,
+                 :takedowns_attempted, :sub_attempts, :reversals,
+                 :control_time_sec)
+            ON CONFLICT(fight_id, fighter_id) DO UPDATE SET
+                knockdowns=excluded.knockdowns,
+                sig_strikes_landed=excluded.sig_strikes_landed,
+                sig_strikes_attempted=excluded.sig_strikes_attempted,
+                total_strikes_landed=excluded.total_strikes_landed,
+                total_strikes_attempted=excluded.total_strikes_attempted,
+                takedowns_landed=excluded.takedowns_landed,
+                takedowns_attempted=excluded.takedowns_attempted,
+                sub_attempts=excluded.sub_attempts,
+                reversals=excluded.reversals,
+                control_time_sec=excluded.control_time_sec
+            """,
             stat_rows,
         )
         conn.commit()
