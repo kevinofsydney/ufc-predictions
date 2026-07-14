@@ -30,7 +30,7 @@ phase's code. This checklist is the resume point for any future agent.
 - [x] Phase 3 — Elo engine (gate: unit tests + top-15 pass; higher-rated wins 57.4% — accepted with deviation, see §1.6)
 - [x] Phase 4 — Point-in-time features (gate: 8,581 rows, leakage guard passes, label mean 0.5006, max NULL 37.82%)
 - [x] Phase 5 — Training + evaluation (gate: artifacts produced; LightGBM test log loss 0.6637, accuracy 60.54%; logistic test log loss 0.6535)
-- [ ] Phase 6 — Prediction CLI (gate: lopsided matchup sanity, probs sum to 100%)
+- [x] Phase 6 — Prediction CLI (gate: Jones–Punk 84.7%/15.3%, order-symmetric, probabilities sum to 100%)
 - [ ] Phase 7 — Incremental update (gate: second consecutive run ingests 0 new fights)
 - [ ] Wrap-up — README + Definition of Done (Part 2 §11)
 

@@ -244,10 +244,11 @@ def _row_dicts(cursor: sqlite3.Cursor) -> list[dict]:
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
-def load_fights(conn: sqlite3.Connection) -> list[dict]:
+def load_fights(
+    conn: sqlite3.Connection, before_date: str | None = None
+) -> list[dict]:
     """Load all fights, stats, Elo, and safe static fighter attributes."""
-    cursor = conn.execute(
-        """
+    query = """
         SELECT
             f.fight_id, e.event_date, f.fighter_a_id, f.fighter_b_id,
             f.winner_id, f.method, f.end_round, f.end_time_sec,
@@ -275,9 +276,13 @@ def load_fights(conn: sqlite3.Connection) -> list[dict]:
             ON sa.fight_id = f.fight_id AND sa.fighter_id = f.fighter_a_id
         LEFT JOIN fight_stats sb
             ON sb.fight_id = f.fight_id AND sb.fighter_id = f.fighter_b_id
-        ORDER BY e.event_date ASC, f.fight_id ASC
-        """
-    )
+    """
+    params: tuple[str, ...] = ()
+    if before_date is not None:
+        query += " WHERE e.event_date < ?"
+        params = (before_date,)
+    query += " ORDER BY e.event_date ASC, f.fight_id ASC"
+    cursor = conn.execute(query, params)
     return _row_dicts(cursor)
 
 
@@ -372,6 +377,89 @@ def build_feature_rows(
             update_state(state_b, stats_b, stats_a, fight, fight["fighter_b_id"])
 
     return rows
+
+
+def build_career_states_as_of(
+    conn: sqlite3.Connection, as_of_date: str
+) -> dict[str, CareerState]:
+    """Build fighter career state using fights strictly before *as_of_date*."""
+    as_of = _parse_iso(as_of_date)
+    if as_of is None or as_of.isoformat() != as_of_date:
+        raise ValueError(f"invalid as-of date: {as_of_date!r}; expected YYYY-MM-DD")
+    states: dict[str, CareerState] = {}
+    for fight in load_fights(conn, before_date=as_of_date):
+        state_a = states.setdefault(fight["fighter_a_id"], CareerState())
+        state_b = states.setdefault(fight["fighter_b_id"], CareerState())
+        stats_a = _stats_record(fight, "a")
+        stats_b = _stats_record(fight, "b")
+        update_state(state_a, stats_a, stats_b, fight, fight["fighter_a_id"])
+        update_state(state_b, stats_b, stats_a, fight, fight["fighter_b_id"])
+    return states
+
+
+def build_matchup_features(
+    conn: sqlite3.Connection,
+    fighter_a_id: str,
+    fighter_b_id: str,
+    as_of_date: str,
+) -> tuple[dict[str, float | int | None], dict[str, float | int]]:
+    """Build an unswapped model vector and diagnostics for an upcoming matchup."""
+    if fighter_a_id == fighter_b_id:
+        raise ValueError("a fighter cannot be matched against themselves")
+    as_of = _parse_iso(as_of_date)
+    if as_of is None or as_of.isoformat() != as_of_date:
+        raise ValueError(f"invalid as-of date: {as_of_date!r}; expected YYYY-MM-DD")
+
+    fighters = {}
+    for fighter_id in (fighter_a_id, fighter_b_id):
+        row = conn.execute(
+            "SELECT fighter_id, height_cm, reach_cm, dob FROM fighters WHERE fighter_id=?",
+            (fighter_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"unknown fighter id: {fighter_id}")
+        fighters[fighter_id] = {
+            "height_cm": row[1],
+            "reach_cm": row[2],
+            "dob": row[3],
+        }
+
+    states = build_career_states_as_of(conn, as_of_date)
+    state_a = states.get(fighter_a_id, CareerState())
+    state_b = states.get(fighter_b_id, CareerState())
+    a = snapshot(state_a, as_of, fighters[fighter_a_id])
+    b = snapshot(state_b, as_of, fighters[fighter_b_id])
+
+    from .ratings import START_RATING, rating_state_as_of
+
+    ratings, _ = rating_state_as_of(conn, as_of_date)
+    elo_a = ratings.get(fighter_a_id, START_RATING)
+    elo_b = ratings.get(fighter_b_id, START_RATING)
+    feature_values = {
+        "elo_diff": _difference(elo_a, elo_b),
+        "age_diff": _difference(a["age"], b["age"]),
+        "reach_diff": _difference(a["reach"], b["reach"]),
+        "height_diff": _difference(a["height"], b["height"]),
+        "slpm_diff": _difference(a["slpm"], b["slpm"]),
+        "sapm_diff": _difference(a["sapm"], b["sapm"]),
+        "str_acc_diff": _difference(a["str_acc"], b["str_acc"]),
+        "str_def_diff": _difference(a["str_def"], b["str_def"]),
+        "td_avg_diff": _difference(a["td_avg"], b["td_avg"]),
+        "td_acc_diff": _difference(a["td_acc"], b["td_acc"]),
+        "sub_avg_diff": _difference(a["sub_avg"], b["sub_avg"]),
+        "ctrl_pct_diff": _difference(a["ctrl_pct"], b["ctrl_pct"]),
+        "finish_rate_diff": _difference(a["finish_rate"], b["finish_rate"]),
+        "win_streak_diff": _difference(a["win_streak"], b["win_streak"]),
+        "n_fights_diff": _difference(a["n_fights"], b["n_fights"]),
+        "layoff_diff": _difference(a["layoff"], b["layoff"]),
+    }
+    diagnostics = {
+        "elo_a": elo_a,
+        "elo_b": elo_b,
+        "n_fights_a": state_a.n_fights,
+        "n_fights_b": state_b.n_fights,
+    }
+    return feature_values, diagnostics
 
 
 def store_feature_rows(conn: sqlite3.Connection, rows: Iterable[dict]) -> int:

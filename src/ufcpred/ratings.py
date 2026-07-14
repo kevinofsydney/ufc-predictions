@@ -113,15 +113,18 @@ def run_elo(
     return rows, ratings, n_fights
 
 
-def _load_fights_chronological(conn) -> list[dict]:
-    cur = conn.execute(
-        """
+def _load_fights_chronological(conn, before_date: str | None = None) -> list[dict]:
+    query = """
         SELECT f.fight_id, f.fighter_a_id, f.fighter_b_id, f.winner_id, f.method
         FROM fights f
         JOIN events e ON e.event_id = f.event_id
-        ORDER BY e.event_date ASC, f.fight_id ASC
-        """
-    )
+    """
+    params: tuple[str, ...] = ()
+    if before_date is not None:
+        query += " WHERE e.event_date < ?"
+        params = (before_date,)
+    query += " ORDER BY e.event_date ASC, f.fight_id ASC"
+    cur = conn.execute(query, params)
     cols = [d[0] for d in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
 
@@ -132,10 +135,18 @@ def compute_and_store() -> int:
     try:
         conn.executescript(ELO_SCHEMA)
         rows, _, _ = run_elo(_load_fights_chronological(conn))
-        conn.execute("DELETE FROM fight_elo")
         conn.executemany(
-            "INSERT INTO fight_elo (fight_id, elo_a_pre, elo_b_pre, n_fights_a, n_fights_b) "
-            "VALUES (:fight_id, :elo_a_pre, :elo_b_pre, :n_fights_a, :n_fights_b)",
+            """
+            INSERT INTO fight_elo
+                (fight_id, elo_a_pre, elo_b_pre, n_fights_a, n_fights_b)
+            VALUES
+                (:fight_id, :elo_a_pre, :elo_b_pre, :n_fights_a, :n_fights_b)
+            ON CONFLICT(fight_id) DO UPDATE SET
+                elo_a_pre=excluded.elo_a_pre,
+                elo_b_pre=excluded.elo_b_pre,
+                n_fights_a=excluded.n_fights_a,
+                n_fights_b=excluded.n_fights_b
+            """,
             rows,
         )
         conn.commit()
@@ -158,6 +169,14 @@ def current_ratings() -> list[tuple[str, str, float, int]]:
     ]
     out.sort(key=lambda t: t[2], reverse=True)
     return out
+
+
+def rating_state_as_of(conn, as_of_date: str) -> tuple[dict[str, float], dict[str, int]]:
+    """Return post-history ratings and fight counts strictly before a date."""
+    _, ratings, n_fights = run_elo(
+        _load_fights_chronological(conn, before_date=as_of_date)
+    )
+    return ratings, n_fights
 
 
 def main() -> None:

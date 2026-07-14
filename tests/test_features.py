@@ -7,7 +7,12 @@ import sqlite3
 import pytest
 
 from ufcpred.db import SCHEMA
-from ufcpred.features import build_feature_rows, fight_duration_sec, store_feature_rows
+from ufcpred.features import (
+    build_feature_rows,
+    build_matchup_features,
+    fight_duration_sec,
+    store_feature_rows,
+)
 from ufcpred.ratings import ELO_SCHEMA
 
 
@@ -134,5 +139,19 @@ def test_store_is_non_destructive_upsert():
         assert store_feature_rows(conn, rows) == 1
         assert store_feature_rows(conn, rows) == 1
         assert conn.execute("SELECT COUNT(*) FROM features").fetchone()[0] == 1
+    finally:
+        conn.close()
+
+
+def test_matchup_features_use_history_strictly_before_date():
+    conn = _database()
+    try:
+        _add_fight(conn, 1, "2020-01-01", (10, 20), (5, 20))
+        _add_fight(conn, 2, "2020-02-01", (20, 40), (10, 20))
+        features, diagnostics = build_matchup_features(conn, "A", "B", "2020-03-01")
+        assert features["slpm_diff"] == pytest.approx(1.5)
+        assert features["sapm_diff"] == pytest.approx(-1.5)
+        assert diagnostics["n_fights_a"] == 2
+        assert diagnostics["n_fights_b"] == 2
     finally:
         conn.close()

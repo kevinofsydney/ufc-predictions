@@ -19,7 +19,7 @@ for running and maintaining the local project.
 | 3 — Elo ratings | Complete | `fight_elo` table |
 | 4 — point-in-time features | Complete | `features` table |
 | 5 — model training | Complete | `models/model.pkl`, reports |
-| 6 — named-matchup CLI | Not implemented yet | planned `ufcpred.predict` command |
+| 6 — named-matchup CLI | Complete | `ufcpred.predict` command |
 | 7 — automated incremental updates | Not implemented yet | planned update command |
 
 The current validation-selected model is LightGBM. Its test log loss is `0.6637` and
@@ -171,17 +171,26 @@ Inspect the model artifact without making a prediction:
 
 ## Predicting a matchup
 
-The trained model exists, but Phase 6's name-resolution and as-of-date feature interface
-has not been implemented yet. Do not manually construct a feature vector unless you are
-validating model internals; it is easy to introduce time leakage or reverse fighter order.
-
-After Phase 6 is complete, the supported command will be:
+Supply two case-insensitive exact fighter names and an optional matchup date:
 
 ```powershell
 .\.venv\Scripts\python.exe -m ufcpred.predict "Fighter One" "Fighter Two" --date 2026-08-01
 ```
 
-This README must be updated when that interface lands.
+For example:
+
+```powershell
+.\.venv\Scripts\python.exe -m ufcpred.predict "Jon Jones" "CM Punk" --date 2026-08-01
+```
+
+The command resolves both names, reconstructs career and Elo state using fights strictly
+before the requested date, and prints complementary win probabilities. It evaluates both
+fighter orientations and averages them so reversing the two command-line names cannot
+change the underlying matchup probabilities. A warning is printed if either fighter has
+fewer than three prior UFC fights.
+
+Omit `--date` to use today's date. Use `--model <path>` to inspect a preserved model
+artifact instead of `models/model.pkl`.
 
 ## Running tests
 
@@ -272,6 +281,7 @@ src/ufcpred/
   ratings.py     chronological pre-fight Elo
   features.py    point-in-time differential features
   train.py       chronological training and reporting
+  predict.py     as-of-date named-matchup prediction CLI
 tests/           parser, Elo, leakage, and training helper tests
 data/            local database, metadata, warnings, and archives (ignored)
 vendor/          local UFC-DataLab checkout (ignored)
