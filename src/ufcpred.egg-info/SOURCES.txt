@@ -1,0 +1,8 @@
+pyproject.toml
+src/ufcpred/__init__.py
+src/ufcpred/db.py
+src/ufcpred.egg-info/PKG-INFO
+src/ufcpred.egg-info/SOURCES.txt
+src/ufcpred.egg-info/dependency_links.txt
+src/ufcpred.egg-info/requires.txt
+src/ufcpred.egg-info/top_level.txt
