@@ -29,7 +29,7 @@ phase's code. This checklist is the resume point for any future agent.
 - [x] Phase 2 — Normalise into SQLite (gate: row counts, >95% non-NULL winner, `pytest tests/test_parse.py`)
 - [x] Phase 3 — Elo engine (gate: unit tests + top-15 pass; higher-rated wins 57.4% — accepted with deviation, see §1.6)
 - [x] Phase 4 — Point-in-time features (gate: 8,581 rows, leakage guard passes, label mean 0.5006, max NULL 37.82%)
-- [ ] Phase 5 — Training + evaluation (gate: artifacts produced, metrics within sanity bounds)
+- [x] Phase 5 — Training + evaluation (gate: artifacts produced; LightGBM test log loss 0.6637, accuracy 60.54%; logistic test log loss 0.6535)
 - [ ] Phase 6 — Prediction CLI (gate: lopsided matchup sanity, probs sum to 100%)
 - [ ] Phase 7 — Incremental update (gate: second consecutive run ingests 0 new fights)
 - [ ] Wrap-up — README + Definition of Done (Part 2 §11)
@@ -117,6 +117,12 @@ These adapt Part 2 to the actual repo/host without changing any design decision:
   gaps by matchmaking design, dragging the pooled number down. Constants are pinned;
   no tuning performed. The Definition-of-Done bound should be read against this
   documented baseline.
+- **Phase 5:** The validation-selected LightGBM improves the Elo-only test log loss by
+  0.0113 (within the expected 0.005–0.02 gain), but its absolute test log loss is 0.6637,
+  slightly above the v1 Definition-of-Done target of 0.66. Logistic regression scores
+  0.6535 on test but was not selected after test inspection: LightGBM was better on the
+  validation split (0.6563 vs 0.6606), so switching would leak test-set information into
+  model selection. The <0.66 final-model criterion remains open for the wrap-up audit.
 
 ---
 
