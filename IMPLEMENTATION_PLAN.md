@@ -32,7 +32,7 @@ phase's code. This checklist is the resume point for any future agent.
 - [x] Phase 5 — Training + evaluation (gate: artifacts produced; LightGBM test log loss 0.6637, accuracy 60.54%; logistic test log loss 0.6535)
 - [x] Phase 6 — Prediction CLI (gate: Jones–Punk 84.7%/15.3%, order-symmetric, probabilities sum to 100%)
 - [x] Phase 7 — Incremental update (gate: two consecutive live runs ingest 0 new fights)
-- [ ] Wrap-up — README + Definition of Done (Part 2 §11)
+- [x] Wrap-up — README + Definition of Done audit complete; open empirical targets remain in §11
 
 ## 1.2 Model tiers (cost-efficient allocation)
 
@@ -568,11 +568,18 @@ implement Appendix A.
 ## 11. Definition of done (v1)
 
 - [ ] All acceptance checks in phases 0–7 pass.
-- [ ] `pytest` passes (parser, ratings, leakage-guard tests).
+- [x] `pytest` passes (37 parser, ratings, leakage, training, prediction, and update tests).
 - [ ] Fresh clone → ingest → parse → ratings → features → train → predict works end to
       end with no manual intervention.
 - [ ] Test-set log loss < 0.66 and higher-Elo-wins sanity holds at 62–68%.
-- [ ] README documents the exact command sequence.
+- [x] README documents the exact command sequence.
+
+Final local audit (2026-07-14): the current checkout completes init → ingest → parse →
+ratings → features → train → predict → live incremental update → bare `pytest` without
+manual intervention between stages. The literal clean-clone rehearsal remains unchecked;
+under the mission-critical no-deletion rule, the audit did not create a large disposable
+duplicate checkout that could not subsequently be removed. The empirical Elo/final-model
+target remains unchecked for the Phase 3 and Phase 5 reasons recorded in §1.6.
 
 ## Appendix A — Fallback custom scraper (only if UFC-DataLab is abandoned)
 

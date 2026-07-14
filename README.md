@@ -26,6 +26,12 @@ The current validation-selected model is LightGBM. Its test log loss is `0.6637`
 test accuracy is `60.54%`. Logistic regression scored `0.6535` and `61.40%` on the same
 untouched test period, but the test set was not used to change the selected model.
 
+All required v1 implementation phases are complete. The original empirical Definition of
+Done is not fully met: the validation-selected model is slightly above the `<0.66` log-loss
+target and the pooled established-fighter Elo hit rate is below the plan's expected range.
+Both results and their audits are recorded in `IMPLEMENTATION_PLAN.md` rather than hidden
+through test-driven model switching or constant tuning.
+
 ## Data preservation
 
 The working dataset, vendored source, trained models, and reports are intentionally
@@ -240,16 +246,35 @@ abandoned; implementing that fallback is outside v1 scope.
 
 ## Running tests
 
-Run only the project's tests because `vendor/UFC-DataLab` contains its own unrelated test
-suite and is inside the working tree:
+Pytest is configured to collect only the project's tests, excluding the unrelated suite
+inside `vendor/UFC-DataLab`:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests -q
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-The current expected result is 37 passing tests. Bare `pytest` currently descends into
-the vendored repository and can fail during collection; repository-level pytest exclusion
-will be added during final wrap-up.
+The current expected result is 37 passing tests. Supplying `tests` explicitly is also
+supported.
+
+## End-to-end verification
+
+The final local audit runs this sequence from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe -c "from ufcpred.db import init_db; init_db()"
+.\.venv\Scripts\python.exe -c "from ufcpred.ingest import load_raw; fights, fighters = load_raw(); print(len(fights), len(fighters))"
+.\.venv\Scripts\python.exe -m ufcpred.parse
+.\.venv\Scripts\python.exe -m ufcpred.ratings
+.\.venv\Scripts\python.exe -m ufcpred.features
+.\.venv\Scripts\python.exe -m ufcpred.train
+.\.venv\Scripts\python.exe -m ufcpred.predict "Jon Jones" "CM Punk" --date 2026-08-01
+.\.venv\Scripts\python.exe -m ufcpred.update
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+Every stage is repeatable without removing prior data. Parsing, Elo, features, and updates
+use non-deleting upserts or inserts; update history and warning logs append; retraining
+archives existing model and report artifacts before writing current versions.
 
 ## Dataset maintenance
 

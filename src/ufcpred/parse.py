@@ -390,7 +390,7 @@ def run() -> dict:
             fighter_rows.append(build_fighter_row(str(details.get("fighter_name") or upper), details))
 
     # ------------------------------------------------------------------- #
-    # Write to the DB (INSERT OR REPLACE; order respects FKs).
+    # Write to the DB (non-deleting upserts; order respects FKs).
     # ------------------------------------------------------------------- #
     init_db()
     conn = get_conn()
@@ -488,7 +488,8 @@ def run() -> dict:
         f"# duplicate fighter-detail names (last kept): {dup_detail_names}",
     ]
     WARNINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    WARNINGS_PATH.write_text("\n".join(header + warnings) + "\n", encoding="utf-8")
+    with WARNINGS_PATH.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(header + warnings) + "\n")
 
     counts["fight_id_collisions"] = fight_id_collisions
     counts["missing_details"] = missing_details
