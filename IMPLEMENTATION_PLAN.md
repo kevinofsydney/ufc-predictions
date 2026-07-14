@@ -25,7 +25,7 @@ phase's code. This checklist is the resume point for any future agent.
 
 - [x] Step 0 — This plan committed to the repo
 - [x] Phase 0 — Scaffold + DB schema (gate: `init_db()` creates 4 tables)
-- [ ] Phase 1 — UFC-DataLab ingest (gate: ~8,700 fights / ~3,700 fighters, recent max date)
+- [x] Phase 1 — UFC-DataLab ingest (gate: ~8,700 fights / ~3,700 fighters, recent max date)
 - [ ] Phase 2 — Normalise into SQLite (gate: row counts, >95% non-NULL winner, `pytest tests/test_parse.py`)
 - [ ] Phase 3 — Elo engine (gate: unit tests, top-15 sanity, higher-rated wins 62–68%)
 - [ ] Phase 4 — Point-in-time features (gate: leakage-guard test, label mean 0.45–0.55, NULL audit)
