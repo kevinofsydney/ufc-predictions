@@ -26,7 +26,7 @@ phase's code. This checklist is the resume point for any future agent.
 - [x] Step 0 — This plan committed to the repo
 - [x] Phase 0 — Scaffold + DB schema (gate: `init_db()` creates 4 tables)
 - [x] Phase 1 — UFC-DataLab ingest (gate: ~8,700 fights / ~3,700 fighters, recent max date)
-- [ ] Phase 2 — Normalise into SQLite (gate: row counts, >95% non-NULL winner, `pytest tests/test_parse.py`)
+- [x] Phase 2 — Normalise into SQLite (gate: row counts, >95% non-NULL winner, `pytest tests/test_parse.py`)
 - [ ] Phase 3 — Elo engine (gate: unit tests, top-15 sanity, higher-rated wins 62–68%)
 - [ ] Phase 4 — Point-in-time features (gate: leakage-guard test, label mean 0.45–0.55, NULL audit)
 - [ ] Phase 5 — Training + evaluation (gate: artifacts produced, metrics within sanity bounds)
@@ -99,7 +99,13 @@ These adapt Part 2 to the actual repo/host without changing any design decision:
 
 ## 1.6 Deviations log
 
-*(append entries here; none yet)*
+- **Phase 2:** Real data differs from spec assumptions, handled without design change:
+  `event_date` is `DD/MM/YYYY` (not month-name); `"---"` appears as a null sentinel;
+  `method` also contains `TKO - Doctor's Stoppage` (mapped → `KO/TKO`). The
+  Sakuraba–Silveira same-night rematch at UFC Ultimate Japan collides under the
+  name-based fight key (1 fight lost of 8,737 — accepted per the known-limitation rule,
+  logged in `data/ingest_warnings.log`). Fighters from the details file who never
+  fought are also inserted (4,110 total) so the predict CLI can resolve any known name.
 
 ---
 
